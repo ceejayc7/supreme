@@ -1,0 +1,20 @@
+{
+  "manifest_version": 2,
+  "name": "Supreme Checkout",
+  "version": "0.1",
+  "background": {
+    "scripts": ["background.js", "lodash.min.js"]
+  },
+  "permissions": ["storage", "cookies", "tabs", "*://*.supremenewyork.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://www.supremenewyork.com/*"],
+      "js": ["content.js"]
+    }
+  ],
+  "page_action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "web_accessible_resources": ["info.json"]
+}

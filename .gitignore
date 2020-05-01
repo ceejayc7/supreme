@@ -1,2 +1,3 @@
 *.txt
-*.json
+info.json
+mock.json
