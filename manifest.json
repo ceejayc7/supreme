@@ -3,13 +3,19 @@
   "name": "Supreme Checkout",
   "version": "0.1",
   "background": {
-    "scripts": ["background.js", "lodash.min.js"]
+    "scripts": [
+      "constants.js",
+      "config.js",
+      "common.js",
+      "background.js",
+      "lodash.min.js"
+    ]
   },
   "permissions": ["storage", "cookies", "tabs", "*://*.supremenewyork.com/*"],
   "content_scripts": [
     {
       "matches": ["https://www.supremenewyork.com/*"],
-      "js": ["content.js"]
+      "js": ["constants.js", "common.js", "content.js"]
     }
   ],
   "page_action": {

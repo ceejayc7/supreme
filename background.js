@@ -1,44 +1,7 @@
-const MOBILE_STOCK_ENDPOINT =
-  "https://www.supremenewyork.com/mobile_stock.json";
-const ITEM_ENDPOINT = "https://www.supremenewyork.com/shop";
-const CHECKOUT = "https://www.supremenewyork.com/checkout";
-const POLLING_INTERVAL = 2000; // 2.5 seconds
-
-// debug
-const preferredItemNames = ["Military Trench Coat"];
-const preferredSizes = ["Small", "Medium", "Large", "XLarge"];
-const preferredColors = ["Black", "Olive Paisley", "Peach Paisley"];
-
-/*
-const preferredItemNames = ["Crewneck"];
-const preferredSizes = ["Small", "Medium"];
-const preferredColors = [
-  "Natural",
-  "Heather Grey",
-  "Black",
-  "Red",
-  "Lime",
-  "Violet",
-]; */
-
-let previousResponse = null;
-let interval = null;
-let isPolling = false;
-
-const difference = (origObj, newObj) => {
-  const changes = (newObj, origObj) => {
-    let arrayIndexCounter = 0;
-    return _.transform(newObj, (result, value, key) => {
-      if (!_.isEqual(value, origObj[key])) {
-        let resultKey = _.isArray(origObj) ? arrayIndexCounter++ : key;
-        result[resultKey] =
-          _.isObject(value) && _.isObject(origObj[key])
-            ? changes(value, origObj[key])
-            : value;
-      }
-    });
-  };
-  return changes(newObj, origObj);
+let state = {
+  previousResponse: null,
+  interval: null,
+  isPolling: false,
 };
 
 const getFilteredItem = (json, color, size) => {
@@ -72,39 +35,70 @@ const getFilteredItem = (json, color, size) => {
   return [];
 };
 
-const sendMessage = (message) => {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    for (const tab of tabs) {
-      if (tab) {
-        chrome.tabs.sendMessage(tab.id, message);
-      }
+const getAnyInStockConfiguration = (itemInfo) => {
+  for (const style of itemInfo.styles) {
+    const filteredStyles = _.filter(
+      style.sizes,
+      (item) => item.stock_level > 0
+    );
+    if (!_.isEmpty(filteredStyles)) {
+      return {
+        style: style.id,
+        size: _.first(filteredStyles).id,
+        urlEncoded: `st=${style.id}&s=${_.first(filteredStyles).id}&qty=1`,
+      };
     }
-  });
+  }
+  return {};
 };
 
-const notifyContent = async (item, itemId) => {
+const addMetadataToItem = async (item, itemId, isDummyItem) => {
   const cookie = await getCookie();
-  sendMessage({ addItemToCart: { item, itemId, cookie } });
+  item.cookie = cookie;
+  item.itemId = itemId;
+  item.isDummyItem = isDummyItem;
+  return item;
+};
+
+const getRemovableItem = async (response) => {
+  const listOfIds = getAllIds(response);
+  for (const id of listOfIds) {
+    const itemInfo = await getItemDetails(id);
+    const item = getAnyInStockConfiguration(itemInfo);
+    if (!_.isEmpty(item)) {
+      return addMetadataToItem(item, id, true);
+    }
+  }
+  return {};
+};
+
+const sendAddItemMsg = async (item) => {
+  if (!_.isEmpty(item)) {
+    sendMessage({ addItemToCart: item });
+  }
 };
 
 const getBestAvailableSizeAndColor = (response) => {
-  const json = JSON.parse(response);
-  for (const size of preferredSizes) {
-    for (const color of preferredColors) {
-      const item = getFilteredItem(json, color, size);
+  for (const size of config.preferredSizes) {
+    for (const color of config.preferredColors) {
+      const item = getFilteredItem(response, color, size);
       if (!_.isEmpty(item)) {
         return item;
       }
     }
   }
-  return null;
+  return {};
 };
 
-const goToCheckout = () => {
+const goToCheckout = (item) => {
   return new Promise((resolve) => {
     const listener = (tabId, info) => {
       if (info.status === "complete") {
         chrome.tabs.onUpdated.removeListener(listener);
+        if (item) {
+          sendMessage({ fillForm: true });
+          sendMessage({ removeFromCart: { item } });
+        }
         resolve(true);
       }
     };
@@ -115,39 +109,19 @@ const goToCheckout = () => {
   });
 };
 
-const getCookie = () => {
-  return new Promise((resolve) =>
-    chrome.cookies.get(
-      { url: "https://www.supremenewyork.com", name: "_supreme_sess" },
-      (cookie) => {
-        cookie ? resolve(cookie.value) : resolve();
-      }
-    )
-  );
-};
-
-const fetchItemDetails = (itemId) => {
-  return fetch(`${ITEM_ENDPOINT}/${itemId}.json`)
-    .then((response) => response.text())
+const checkoutItem = (itemId, isDummyItem) => {
+  return getItemDetails(itemId)
     .then(getBestAvailableSizeAndColor)
-    .then((item) => {
-      if (item) {
-        notifyContent(item, itemId);
-        return true;
-      }
-      return false;
-    })
-    .catch((err) => {
-      console.error(err);
-      return false;
-    });
+    .then((item) => addMetadataToItem(item, itemId, isDummyItem))
+    .then(sendAddItemMsg)
+    .catch(console.error);
 };
 
 const isValidItemName = (item) => {
   if (!item?.name) {
     return false;
   }
-  for (const preferredItem of preferredItemNames) {
+  for (const preferredItem of config.preferredItemNames) {
     const cleanName = _.replace(item.name, /®/g, "").toLowerCase();
     if (cleanName.includes(preferredItem.toLowerCase())) {
       console.log(`Matched: "${item.name}" from "${preferredItem}"`);
@@ -158,19 +132,23 @@ const isValidItemName = (item) => {
   return false;
 };
 
-const getMockData = () => {
-  const url = chrome.runtime.getURL("mock.json");
-  return fetch(url).then((response) => response.json());
+const addDummyItemToCart = async (response) => {
+  const item = await getRemovableItem(response);
+  console.log(`Adding dummy item ${item.itemId}`);
+  sendAddItemMsg(item);
 };
 
 const handleResponse = async (response) => {
-  const json = JSON.parse(response);
   console.log(`${new Date().toISOString()}: Polling`);
-  previousResponse = await getMockData();
+
+  // debug
+  if (state.previousResponse !== null) {
+    state.previousResponse = await getMockData();
+  }
 
   // debug to mock a new drop
   /*
-  previousResponse = _.cloneDeep(JSON.parse(response));
+  state.previousResponse = _.cloneDeep(response);
   json.products_and_categories.Jackets.push({
     name: "Supreme®/New Era®/MLB Varsity Jacket",
     id: 173174,
@@ -216,55 +194,46 @@ const handleResponse = async (response) => {
     category_name: "Shirts",
   });
   */
+
   // cannot diff on the first run
-  if (previousResponse === null) {
+  if (state.previousResponse === null) {
     console.log("Retrieved first API response to diff against");
-    previousResponse = json;
+    await addDummyItemToCart(response);
+    state.previousResponse = response;
     return;
   }
-  const diff = difference(previousResponse, json);
+
+  const diff = difference(state.previousResponse, response);
   if (!_.isEmpty(diff)) {
     console.log("Diff found");
     console.log(diff);
     for (const itemType in diff?.products_and_categories) {
       for (const item of diff.products_and_categories[itemType]) {
-        console.log("here1");
         if (isValidItemName(item)) {
-          const isSuccessfulFetch = await fetchItemDetails(item.id);
-          if (isSuccessfulFetch) {
-            console.log("break");
-            //break;
-          }
+          checkoutItem(item.id, false);
         }
       }
     }
-    clearState();
   } else {
-    previousResponse = json;
+    state.previousResponse = response;
   }
 };
 
 const pollForNewDrops = async () => {
-  if (isPolling) {
+  if (state.isPolling) {
     console.log("Already polling, skipping this run");
     return;
   }
-  isPolling = true;
-  await fetch(MOBILE_STOCK_ENDPOINT)
-    .then((response) => response.text())
-    .then(handleResponse)
-    .catch(console.error);
-  isPolling = false;
+  state.isPolling = true;
+  await get(MOBILE_STOCK_ENDPOINT).then(handleResponse).catch(console.error);
+  state.isPolling = false;
 };
 
-const setCheckboxState = (isEnabled) =>
-  chrome.storage.sync.set({ checkbox: isEnabled });
-
 const clearState = () => {
-  clearInterval(interval);
-  previousResponse = null;
-  interval = null;
-  isPolling = false;
+  clearInterval(state.interval);
+  state.previousResponse = null;
+  state.interval = null;
+  state.isPolling = false;
   setCheckboxState(false);
   console.log("Supreme extension disabled");
 };
@@ -273,11 +242,13 @@ chrome.runtime.onMessage.addListener((message, sender) => {
   if (message?.icon === "activate_icon") {
     chrome.pageAction.show(sender.tab.id);
   } else if (message?.goToCheckout) {
-    goToCheckout().then(() => sendMessage({ fillForm: true }));
+    goToCheckout(message?.goToCheckout);
+  } else if (message?.clearState) {
+    clearState();
   } else if ("checkbox" in message) {
     if (message.checkbox) {
       console.log("Supreme extension enabled");
-      interval = setInterval(pollForNewDrops, POLLING_INTERVAL);
+      state.interval = setInterval(pollForNewDrops, config.POLLING_INTERVAL);
       pollForNewDrops();
     } else {
       clearState();
