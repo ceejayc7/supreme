@@ -18,22 +18,28 @@ const submitCheckout = () => {
 
 const fillCheckout = async () => {
   const data = await getPersonalData();
-  document.getElementById("order_billing_name").value = data.name;
-  document.getElementById("order_email").value = data.email;
-  document.getElementById("order_tel").value = data.phone;
-  document.getElementById("bo").value = data.address;
-  document.getElementById("order_billing_zip").value = data.zip;
-  document.getElementById("order_billing_city").value = data.city;
-  document.getElementById("order_billing_state").value = data.state;
-  document.getElementById("order_billing_country").value = data.country;
+  document.getElementById(BILLING_NAME).value = data.name;
+  document.getElementById(EMAIL).value = data.email;
+  document.getElementById(PHONE_NUMBER).value = data.phone;
+  document.getElementById(ADDRESS).value = data.address;
+  document.getElementById(BILLING_ZIP).value = data.zip;
+  document.getElementById(BILLING_CITY).value = data.city;
+  document.getElementById(BILLING_STATE).value = data.state;
+  document.getElementById(BILLING_COUNTRY).value = data.country;
 
-  document.getElementById("rnsnckrn").value = data.creditCardNumber;
-  document.getElementById("credit_card_month").value = data.expirationMonth;
-  document.getElementById("credit_card_year").value = data.expirationYear;
+  document.getElementById(CREDIT_CARD_NUMBER).value = data.creditCardNumber;
+  document.getElementById(CREDIT_CARD_EXPIRATION_MONTH).value =
+    data.expirationMonth;
+  document.getElementById(CREDIT_CARD_EXPIRATION_YEAR).value =
+    data.expirationYear;
 
-  document.getElementById("orcer").value = data.securityCode;
+  document.getElementById(CREDIT_CARD_SECURITY_CODE).value = data.securityCode;
 
-  document.getElementsByClassName("has-checkbox")[0].click();
+  if (data.apt) {
+    document.getElementById(APT).value = data.apt;
+  }
+
+  document.getElementsByClassName(TOS_CHECKBOX)[0].click();
 };
 
 const addToCart = (item) => {

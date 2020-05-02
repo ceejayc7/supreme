@@ -52,14 +52,6 @@ const getAnyInStockConfiguration = (itemInfo) => {
   return {};
 };
 
-const addMetadataToItem = async (item, itemId, isDummyItem) => {
-  const cookie = await getCookie();
-  item.cookie = cookie;
-  item.itemId = itemId;
-  item.isDummyItem = isDummyItem;
-  return item;
-};
-
 const getRemovableItem = async (response) => {
   const listOfIds = getAllIds(response);
   for (const id of listOfIds) {
@@ -70,12 +62,6 @@ const getRemovableItem = async (response) => {
     }
   }
   return {};
-};
-
-const sendAddItemMsg = async (item) => {
-  if (!_.isEmpty(item)) {
-    sendMessage({ addItemToCart: item });
-  }
 };
 
 const getBestAvailableSizeAndColor = (response) => {
@@ -145,55 +131,6 @@ const handleResponse = async (response) => {
   if (state.previousResponse !== null) {
     state.previousResponse = await getMockData();
   }
-
-  // debug to mock a new drop
-  /*
-  state.previousResponse = _.cloneDeep(response);
-  json.products_and_categories.Jackets.push({
-    name: "Supreme®/New Era®/MLB Varsity Jacket",
-    id: 173174,
-    image_url: "//assets.supremenewyork.com/184855/ca/YM4aR2S3Mh0.jpg",
-    image_url_hi: "//assets.supremenewyork.com/184855/rc/YM4aR2S3Mh0.jpg",
-    price: 32800,
-    sale_price: 0,
-    new_item: true,
-    position: 6,
-    category_name: "Jackets",
-  });
-  json.products_and_categories.Jackets.push({
-    name: "Quilted Cordura® Lined Jacket",
-    id: 173175,
-    image_url: "//assets.supremenewyork.com/185739/ca/o9vAOEycseo.jpg",
-    image_url_hi: "//assets.supremenewyork.com/185739/rc/o9vAOEycseo.jpg",
-    price: 21800,
-    sale_price: 0,
-    new_item: true,
-    position: 7,
-    category_name: "Jackets",
-  });
-  json.products_and_categories.Jackets.push({
-    name: "Raglan Court Jacket",
-    id: 173136,
-    image_url: "//assets.supremenewyork.com/185954/ca/D4E7vR4__Q8.jpg",
-    image_url_hi: "//assets.supremenewyork.com/185954/rc/D4E7vR4__Q8.jpg",
-    price: 22800,
-    sale_price: 0,
-    new_item: false,
-    position: 9,
-    category_name: "Jackets",
-  });
-  json.products_and_categories.Shirts.push({
-    name: "Bowling Zip S/S Shirt",
-    id: 173140,
-    image_url: "//assets.supremenewyork.com/185441/ca/yHl3_5v9a-A.jpg",
-    image_url_hi: "//assets.supremenewyork.com/185441/rc/yHl3_5v9a-A.jpg",
-    price: 12800,
-    sale_price: 0,
-    new_item: false,
-    position: 10,
-    category_name: "Shirts",
-  });
-  */
 
   // cannot diff on the first run
   if (state.previousResponse === null) {

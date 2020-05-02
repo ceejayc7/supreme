@@ -58,6 +58,20 @@ const sendMessage = (message) => {
   });
 };
 
+const sendAddItemMsg = (item) => {
+  if (!_.isEmpty(item)) {
+    sendMessage({ addItemToCart: item });
+  }
+};
+
+const addMetadataToItem = async (item, itemId, isDummyItem) => {
+  const cookie = await getCookie();
+  item.cookie = cookie;
+  item.itemId = itemId;
+  item.isDummyItem = isDummyItem;
+  return item;
+};
+
 const setCheckboxState = (isEnabled) =>
   chrome.storage.sync.set({ checkbox: isEnabled });
 
