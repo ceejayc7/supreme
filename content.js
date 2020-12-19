@@ -13,7 +13,9 @@ chrome.extension.onMessage.addListener((msg) => {
 const submitCheckout = () => {
   console.log("Submit checkout");
   chrome.runtime.sendMessage({ clearState: true });
-  // document.getElementById("pay").getElementsByTagName("input")[0].click();
+  if(config.enablePay) {
+    document.getElementById("pay").getElementsByTagName("input")[0].click();
+  }
 };
 
 const fillCheckout = async () => {
@@ -45,6 +47,7 @@ const fillCheckout = async () => {
 const addToCart = (item) => {
   const endpoint = `${ITEM_ENDPOINT}/${item.itemId}/add.json`;
   const body = item.urlEncoded;
+  console.log(`Trying to add ${item.itemId} to cart`);
 
   return request(endpoint, "POST", body, item?.cookie).then((response) => {
     if (response.length) {

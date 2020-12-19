@@ -1,15 +1,14 @@
 //
 // Configuration
 //
+
 const config = {
-  POLLING_INTERVAL: 5000,
-  preferredItemNames: ["Military Trench Coat"],
-  preferredSizes: ["Small", "Medium", "Large", "XLarge"],
-  preferredColors: [
-    "Black",
-    "Olive Paisley",
-    "Peach Paisley",
-    "Pink",
-    "Light Blue",
-  ],
+  POLLING_INTERVAL: 1000,
+  preferredItemNames: ["Cross Box Logo Tee"],
+  preferredSizes: ["Small"],
+  preferredColors: ["White", "Black", "Red", "Purple", "Navy", "Light Olive", "Yellow", "Natural"],
+  enableDebug: false,
+  enableTimeout: true,
+  timeToStartTimeout: 1608220795,
+  enablePay: true
 };

@@ -58,9 +58,16 @@ const sendMessage = (message) => {
   });
 };
 
-const sendAddItemMsg = (item) => {
-  if (!_.isEmpty(item)) {
-    sendMessage({ addItemToCart: item });
+const sendAddItemMsg = (listOfItems) => {
+  if (!_.isEmpty(listOfItems)) {
+    if (listOfItems.constructor === Array) {
+      for (const item of listOfItems) {
+        console.log(`sending to content: ${JSON.stringify(item)}`);
+        sendMessage({ addItemToCart: item });
+      }
+    } else {
+      sendMessage({ addItemToCart: listOfItems });
+    }
   }
 };
 

@@ -58,22 +58,23 @@ const getRemovableItem = async (response) => {
     const itemInfo = await getItemDetails(id);
     const item = getAnyInStockConfiguration(itemInfo);
     if (!_.isEmpty(item)) {
-      return addMetadataToItem(item, id, true);
+      return await addMetadataToItem(item, id, true);
     }
   }
   return {};
 };
 
 const getBestAvailableSizeAndColor = (response) => {
+  const list = [];
   for (const size of config.preferredSizes) {
     for (const color of config.preferredColors) {
       const item = getFilteredItem(response, color, size);
       if (!_.isEmpty(item)) {
-        return item;
+        list.push(item);
       }
     }
   }
-  return {};
+  return list;
 };
 
 const goToCheckout = (item) => {
@@ -95,10 +96,17 @@ const goToCheckout = (item) => {
   });
 };
 
-const checkoutItem = (itemId, isDummyItem) => {
+const checkoutItem = async (itemId, isDummyItem) => {
   return getItemDetails(itemId)
     .then(getBestAvailableSizeAndColor)
-    .then((item) => addMetadataToItem(item, itemId, isDummyItem))
+    .then(async (listOfItems) => {
+      const newList = [];
+      for (const item of listOfItems) {
+        const newItem = await addMetadataToItem(item, itemId, isDummyItem);
+        newList.push(newItem);
+      }
+      return newList;
+    })
     .then(sendAddItemMsg)
     .catch(console.error);
 };
@@ -109,8 +117,9 @@ const isValidItemName = (item) => {
   }
   for (const preferredItem of config.preferredItemNames) {
     const cleanName = _.replace(item.name, /®/g, "").toLowerCase();
-    if (cleanName.includes(preferredItem.toLowerCase())) {
-      console.log(`Matched: "${item.name}" from "${preferredItem}"`);
+    const cleanPreferredItem = _.replace(preferredItem, /®/g, "").toLowerCase();
+    if (cleanName.includes(cleanPreferredItem.toLowerCase())) {
+      console.log(`Matched: "${item.name}" from "${cleanPreferredItem}"`);
       console.log(item);
       return true;
     }
@@ -127,8 +136,7 @@ const addDummyItemToCart = async (response) => {
 const handleResponse = async (response) => {
   console.log(`${new Date().toISOString()}: Polling`);
 
-  // debug
-  if (state.previousResponse !== null) {
+  if (config?.enableDebug && state.previousResponse !== null) {
     state.previousResponse = await getMockData();
   }
 
@@ -147,6 +155,7 @@ const handleResponse = async (response) => {
     for (const itemType in diff?.products_and_categories) {
       for (const item of diff.products_and_categories[itemType]) {
         if (isValidItemName(item)) {
+          clearPolling();
           checkoutItem(item.id, false);
         }
       }
@@ -161,19 +170,29 @@ const pollForNewDrops = async () => {
     console.log("Already polling, skipping this run");
     return;
   }
-  state.isPolling = true;
+  //state.isPolling = true;
   await get(MOBILE_STOCK_ENDPOINT).then(handleResponse).catch(console.error);
   state.isPolling = false;
 };
 
-const clearState = () => {
+const clearPolling = () => {
   clearInterval(state.interval);
-  state.previousResponse = null;
   state.interval = null;
   state.isPolling = false;
+};
+
+const clearState = () => {
+  clearPolling();
+  state.previousResponse = null;
   setCheckboxState(false);
   console.log("Supreme extension disabled");
 };
+
+const enable = () => {
+  console.log("Supreme extension enabled");
+  state.interval = setInterval(pollForNewDrops, config.POLLING_INTERVAL);
+  pollForNewDrops();
+}
 
 chrome.runtime.onMessage.addListener((message, sender) => {
   if (message?.icon === "activate_icon") {
@@ -184,12 +203,16 @@ chrome.runtime.onMessage.addListener((message, sender) => {
     clearState();
   } else if ("checkbox" in message) {
     if (message.checkbox) {
-      console.log("Supreme extension enabled");
-      state.interval = setInterval(pollForNewDrops, config.POLLING_INTERVAL);
-      pollForNewDrops();
+      enable();
     } else {
       clearState();
     }
     setCheckboxState(message.checkbox);
   }
 });
+
+if(config?.enableTimeout && config?.timeToStartTimeout) {
+  const currentEpoch = Date.now() / 1000;
+  const diffTime = (config.timeToStartTimeout - currentEpoch) * 1000;
+  setTimeout(enable, diffTime);
+}
